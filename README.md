@@ -13,7 +13,6 @@
 
 - Any programming language is allowed.
 - No external libraries are allowed except std.
-  - (There may be some languages that do some weird stuff, but essentially I mean no external deps)
 
 ### Usage
 
