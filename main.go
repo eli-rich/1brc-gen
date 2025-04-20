@@ -190,10 +190,13 @@ func main() {
 						xi = int(x - 0.5)
 					}
 
-					neg := xi < 0
-
 					xi = max(xi, -999)
 					xi = min(xi, 999)
+
+					neg := xi < 0
+					if neg {
+						xi = -xi
+					}
 
 					ip := xi / 10
 					fp := absInt(xi % 10)
