@@ -31,6 +31,13 @@ type CityProfile struct {
 	seasonal float64
 }
 
+func absInt(x int) int {
+	if x < 0 {
+		return -x
+	}
+	return x
+}
+
 func main() {
 	startTime := time.Now()
 
@@ -41,24 +48,27 @@ func main() {
 		outFile   string
 		lineCount uint
 		seed      int64
+		chunkSize int
+		bufPW     int
 	)
 	flag.StringVar(&outFile, "o", "out.txt", "Output file")
 	flag.UintVar(&lineCount, "lc", 1_000_000_000, "Lines to output")
 	flag.Int64Var(&seed, "s", 2002, "Seed for RNG")
+	flag.IntVar(&chunkSize, "c", 100_000, "How many lines to batch in each worker->writer chunk")
+	flag.IntVar(&bufPW, "b", 2, "How many chunks to buffer PER WORKER (total = cores*buf)")
 	flag.Parse()
 
-	fmt.Printf("Starting generation of file: %s with %d lines. Seed: %d\n", outFile, lineCount, seed)
+	fmt.Printf("Generating %d lines into %q using chunk=%d buf=%d seed=%d\n", lineCount, outFile, chunkSize, bufPW, seed)
 
 	f, err := os.Create(outFile)
 	if err != nil {
 		log.Fatalf("error creating file: %s\n%v", outFile, err)
 	}
-	out := bufio.NewWriterSize(f, 8192*1024)
+	out := bufio.NewWriterSize(f, 8<<20)
 	defer f.Close()
 
 	cores := min(runtime.NumCPU(), int(lineCount))
-	lpw := int(lineCount) / cores
-	lpw = max(lpw, 1)
+	lpw := max(int(lineCount)/cores, 1)
 
 	cityBytes := make([][]byte, len(cities))
 	for i, city := range cities {
@@ -108,7 +118,7 @@ func main() {
 		}
 	}
 
-	dataC := make(chan ChunkData, cores*2)
+	dataC := make(chan ChunkData, cores*bufPW)
 
 	var writerWG sync.WaitGroup
 	writerWG.Add(1)
@@ -143,50 +153,62 @@ func main() {
 
 			r := rand.New(rand.NewSource(seed + int64(workerId)))
 
-			startLine := workerId * lpw
-			endLine := startLine + lpw
+			start := workerId * lpw
+			end := start + lpw
 
 			if workerId == cores-1 {
-				endLine = int(lineCount)
+				end = int(lineCount)
 			}
 
-			chunkSize := 100_000
-			chunkSize = min(chunkSize, (endLine - startLine))
+			sz := min(chunkSize, (end - start))
 
-			if startLine >= endLine {
+			if start >= end {
 				return
 			}
 
-			for chunkStart := startLine; chunkStart < endLine; chunkStart += chunkSize {
-				chunkEnd := min(chunkStart+chunkSize, endLine)
+			for base := start; base < end; base += sz {
+				top := min(base+sz, end)
+				buf := make([]byte, 0, sz*20)
 
-				buf := make([]byte, 0, chunkSize*30)
-				for j := chunkStart; j < chunkEnd; j++ {
+				for l := base; l < top; l++ {
 					cityIdx := r.Intn(len(cityBytes))
 					profile := cityProfiles[cityIdx]
-					timeEffect := math.Sin(float64(j%365)/58) * profile.seasonal
+					timeEffect := math.Sin(float64(l%365)/58) * profile.seasonal
 
 					rawTemp := profile.baseTemp +
 						(timeEffect * profile.variance) +
 						(r.Float64()*2-1)*profile.variance*(1-profile.seasonal)
 
-					// Clamp temperature to our range and round to 1 decimal place
-					rawTemp = max(-99.9, min(99.9, rawTemp))
-					temp := math.Round(rawTemp*10) / 10
+					// clamp to [-99.9, 99.9] with 1 fractional digit
+					rawTemp = max(rawTemp, -99.9)
+					rawTemp = min(rawTemp, 99.9)
 
-					// Convert to string with exactly one decimal place
-					tempBytes := []byte(strconv.FormatFloat(temp, 'f', 1, 64))
+					x := rawTemp * 10
+					var xi int
+					if x >= 0 {
+						xi = int(x + 0.5)
+					} else {
+						xi = int(x - 0.5)
+					}
+
+					xi = max(xi, -999)
+					xi = min(xi, 999)
+
+					ip := xi / 10
+					fp := absInt(xi % 10)
 
 					buf = append(buf, cityBytes[cityIdx]...)
 					buf = append(buf, ';')
-					buf = append(buf, tempBytes...)
-					if j != lc-1 {
+					buf = append(buf, strconv.Itoa(ip)...)
+					buf = append(buf, '.')
+					buf = append(buf, byte('0'+fp))
+					if l != lc-1 {
 						buf = append(buf, '\n')
 					}
 				}
 				dataC <- ChunkData{
-					start: chunkStart,
-					count: chunkEnd - chunkStart,
+					start: base,
+					count: top - base,
 					data:  buf,
 				}
 			}
