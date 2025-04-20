@@ -19,7 +19,7 @@
 
 - The data file is approximately 13-16 GB
 - The purpose of this repo is to provide you with a program to generate this file.
-- `go run github.com/eli-rich/1brc-gen@v1.0.0 -lc 1000000000`
+- `go run github.com/eli-rich/1brc-gen@v1.0.1 -lc 1000000000`
   - `-lc`: linecount, defaults to 1 billion
   - `-o`: outfile, defaults to `out.txt`
   - `-s`: seed, defaults to `2002`
