@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"math"
 	"math/rand"
 	"os"
 	"runtime"
@@ -21,6 +22,12 @@ var input string
 type ChunkData struct {
 	id   int
 	data []byte
+}
+
+type CityProfile struct {
+	baseTemp float64
+	variance float64
+	seasonal float64
 }
 
 func main() {
@@ -57,12 +64,47 @@ func main() {
 		cityBytes[i] = []byte(city)
 	}
 
-	// Temp range: [-99.9, 99.9]; STEP: 0.1
-	const tempPrecision = 1999
-	tempStrings := make([][]byte, tempPrecision)
-	for i := range tempPrecision {
-		temp := (float64(i) / 10.0) - 99.9
-		tempStrings[i] = []byte(strconv.FormatFloat(temp, 'f', 1, 64))
+	cityProfiles := make([]CityProfile, len(cities))
+	cityRand := rand.New(rand.NewSource(seed))
+
+	const (
+		percentHot       = 0.2
+		percentCold      = 0.15
+		percentTemperate = 0.3
+	)
+
+	for i := range len(cities) {
+		r := cityRand.Float64()
+
+		if r < percentHot {
+			// Hot cities (deserts, tropical)
+			cityProfiles[i] = CityProfile{
+				baseTemp: cityRand.Float64()*15 + 25,   // 25-40°C base
+				variance: cityRand.Float64()*15 + 5,    // 5-20°C variance
+				seasonal: cityRand.Float64()*0.3 + 0.2, // 0.2-0.5 seasonal effect
+			}
+		} else if r < percentHot+percentCold {
+			// Cold cities (arctic, subarctic)
+			cityProfiles[i] = CityProfile{
+				baseTemp: cityRand.Float64()*15 - 25,   // -25 to -10°C base
+				variance: cityRand.Float64()*20 + 10,   // 10-30°C variance
+				seasonal: cityRand.Float64()*0.4 + 0.5, // 0.5-0.9 seasonal effect
+			}
+		} else if r < percentHot+percentCold+percentTemperate {
+			// Temperate climate cities
+			cityProfiles[i] = CityProfile{
+				baseTemp: cityRand.Float64()*15 + 5,    // 5-20°C base
+				variance: cityRand.Float64()*10 + 10,   // 10-20°C variance
+				seasonal: cityRand.Float64()*0.3 + 0.6, // 0.6-0.9 seasonal effect
+			}
+		} else {
+			// Random other cities with varied climates
+			cityProfiles[i] = CityProfile{
+				baseTemp: cityRand.Float64()*70 - 35,   // -35 to 35°C base
+				variance: cityRand.Float64()*25 + 5,    // 5-30°C variance
+				seasonal: cityRand.Float64()*0.8 + 0.2, // 0.2-1.0 seasonal effect
+			}
+		}
 	}
 
 	dataC := make(chan ChunkData, cores*2)
@@ -126,15 +168,19 @@ func main() {
 				buf := make([]byte, 0, chunkSize*30)
 				for j := chunkStart; j < chunkEnd; j++ {
 					cityIdx := r.Intn(len(cityBytes))
-					var tempBytes []byte
+					profile := cityProfiles[cityIdx]
+					timeEffect := math.Sin(float64(j%365)/58) * profile.seasonal
 
-					if r.Intn(10) < 8 {
-						tempIdx := r.Intn(tempPrecision)
-						tempBytes = tempStrings[tempIdx]
-					} else {
-						temp := r.Float64()*199.8 - 99.9
-						tempBytes = []byte(strconv.FormatFloat(temp, 'f', 1, 64))
-					}
+					rawTemp := profile.baseTemp +
+						(timeEffect * profile.variance) +
+						(r.Float64()*2-1)*profile.variance*(1-profile.seasonal)
+
+					// Clamp temperature to our range and round to 1 decimal place
+					rawTemp = math.Max(-99.9, math.Min(99.9, rawTemp))
+					temp := math.Round(rawTemp*10) / 10
+
+					// Convert to string with exactly one decimal place
+					tempBytes := []byte(strconv.FormatFloat(temp, 'f', 1, 64))
 
 					buf = append(buf, cityBytes[cityIdx]...)
 					buf = append(buf, ';')
