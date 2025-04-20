@@ -180,8 +180,7 @@ func main() {
 						(r.Float64()*2-1)*profile.variance*(1-profile.seasonal)
 
 					// clamp to [-99.9, 99.9] with 1 fractional digit
-					rawTemp = max(rawTemp, -99.9)
-					rawTemp = min(rawTemp, 99.9)
+					rawTemp = max(-99.9, min(99.9, rawTemp))
 
 					x := rawTemp * 10
 					var xi int

@@ -2,6 +2,7 @@
 
 1brc-gen
 out.txt
+correct.txt
 
 # node stuff for manipulating world-cities.txt
 manip.ts
