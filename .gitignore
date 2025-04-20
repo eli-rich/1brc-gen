@@ -1,2 +1,9 @@
 .vscode/
+
+1brc-gen
 out.txt
+
+# node stuff for manipulating world-cities.txt
+manip.ts
+node_modules/
+tsconfig.json

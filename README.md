@@ -5,7 +5,8 @@
 ### Constraints
 
 - All lines are of format `<city name>: string;<temperature>: float64`
-- There are **at most** 29,827 unique cities
+- There are **at most** `20,102` unique cities
+- All city names are between `[4, 13]` characters inclusive
 - All temperatures range between `[-99.9, 99.9]` inclusive
 - All temperatures have exactly 1 digit after the decimal (ex: `22.4`, `0.0`, `-77.2`)
 
@@ -19,7 +20,7 @@
 - The data file is approximately 13-16 GB
 - The purpose of this repo is to provide you with a program to generate this file.
 - `go run github.com/eli-rich/1brc-gen@v1.0.0 -lc 1000000000`
-  - `-lc`: linecount, defaults to 1 million
+  - `-lc`: linecount, defaults to 1 billion
   - `-o`: outfile, defaults to `out.txt`
   - `-s`: seed, defaults to `2002`
 

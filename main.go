@@ -20,8 +20,9 @@ import (
 var input string
 
 type ChunkData struct {
-	id   int
-	data []byte
+	start int
+	count int
+	data  []byte
 }
 
 type CityProfile struct {
@@ -41,9 +42,9 @@ func main() {
 		lineCount uint
 		seed      int64
 	)
-	flag.StringVar(&outFile, "o", "out.txt", "Output file (out.txt by default)")
-	flag.UintVar(&lineCount, "lc", 1_000_000, "Lines to output (1,000,000 by default)")
-	flag.Int64Var(&seed, "s", 2002, "Seed for RNG (2,002 by default)")
+	flag.StringVar(&outFile, "o", "out.txt", "Output file")
+	flag.UintVar(&lineCount, "lc", 1_000_000_000, "Lines to output")
+	flag.Int64Var(&seed, "s", 2002, "Seed for RNG")
 	flag.Parse()
 
 	fmt.Printf("Starting generation of file: %s with %d lines. Seed: %d\n", outFile, lineCount, seed)
@@ -115,25 +116,19 @@ func main() {
 	go func() {
 		defer writerWG.Done()
 
-		nextId := 0
-		chunks := make(map[int][]byte)
+		nextStart := 0
+		buf := make(map[int]ChunkData)
 
 		for chunk := range dataC {
-			if chunk.id == nextId {
-				out.Write(chunk.data)
-				nextId++
-
-				for {
-					if data, ok := chunks[nextId]; ok {
-						out.Write(data)
-						delete(chunks, nextId)
-						nextId++
-					} else {
-						break
-					}
+			buf[chunk.start] = chunk
+			for {
+				if next, ok := buf[nextStart]; !ok {
+					break
+				} else {
+					out.Write(next.data)
+					delete(buf, nextStart)
+					nextStart += next.count
 				}
-			} else {
-				chunks[chunk.id] = chunk.data
 			}
 		}
 		out.Flush()
@@ -143,7 +138,7 @@ func main() {
 	wg.Add(cores)
 
 	for i := range cores {
-		go func(workerId int) {
+		go func(workerId int, lc int) {
 			defer wg.Done()
 
 			r := rand.New(rand.NewSource(seed + int64(workerId)))
@@ -176,7 +171,7 @@ func main() {
 						(r.Float64()*2-1)*profile.variance*(1-profile.seasonal)
 
 					// Clamp temperature to our range and round to 1 decimal place
-					rawTemp = math.Max(-99.9, math.Min(99.9, rawTemp))
+					rawTemp = max(-99.9, min(99.9, rawTemp))
 					temp := math.Round(rawTemp*10) / 10
 
 					// Convert to string with exactly one decimal place
@@ -185,14 +180,17 @@ func main() {
 					buf = append(buf, cityBytes[cityIdx]...)
 					buf = append(buf, ';')
 					buf = append(buf, tempBytes...)
-					buf = append(buf, '\n')
+					if j != lc-1 {
+						buf = append(buf, '\n')
+					}
 				}
 				dataC <- ChunkData{
-					data: buf,
-					id:   chunkStart / chunkSize,
+					start: chunkStart,
+					count: chunkEnd - chunkStart,
+					data:  buf,
 				}
 			}
-		}(i)
+		}(i, int(lineCount))
 	}
 	wg.Wait()
 	close(dataC)
