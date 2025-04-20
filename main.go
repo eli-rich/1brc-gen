@@ -35,7 +35,7 @@ func main() {
 		seed      int64
 	)
 	flag.StringVar(&outFile, "o", "out.txt", "Output file (out.txt by default)")
-	flag.UintVar(&lineCount, "lc", 100_000, "Lines to output (100,000 by default)")
+	flag.UintVar(&lineCount, "lc", 1_000_000, "Lines to output (1,000,000 by default)")
 	flag.Int64Var(&seed, "s", 2002, "Seed for RNG (2,002 by default)")
 	flag.Parse()
 
