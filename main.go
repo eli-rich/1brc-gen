@@ -190,6 +190,8 @@ func main() {
 						xi = int(x - 0.5)
 					}
 
+					neg := xi < 0
+
 					xi = max(xi, -999)
 					xi = min(xi, 999)
 
@@ -198,6 +200,9 @@ func main() {
 
 					buf = append(buf, cityBytes[cityIdx]...)
 					buf = append(buf, ';')
+					if neg {
+						buf = append(buf, '-')
+					}
 					buf = append(buf, strconv.Itoa(ip)...)
 					buf = append(buf, '.')
 					buf = append(buf, byte('0'+fp))
