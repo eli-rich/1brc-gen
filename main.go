@@ -48,14 +48,9 @@ func main() {
 	out := bufio.NewWriterSize(f, 8192*1024)
 	defer f.Close()
 
-	cores := runtime.NumCPU()
-	if cores > int(lineCount) {
-		cores = int(lineCount)
-	}
+	cores := min(runtime.NumCPU(), int(lineCount))
 	lpw := int(lineCount) / cores
-	if lpw == 0 {
-		lpw = 1
-	}
+	lpw = max(lpw, 1)
 
 	cityBytes := make([][]byte, len(cities))
 	for i, city := range cities {
@@ -119,19 +114,14 @@ func main() {
 			}
 
 			chunkSize := 100_000
-			if chunkSize > (endLine - startLine) {
-				chunkSize = endLine - startLine
-			}
+			chunkSize = min(chunkSize, (endLine - startLine))
 
 			if startLine >= endLine {
 				return
 			}
 
 			for chunkStart := startLine; chunkStart < endLine; chunkStart += chunkSize {
-				chunkEnd := chunkStart + chunkSize
-				if chunkEnd > endLine {
-					chunkEnd = endLine
-				}
+				chunkEnd := min(chunkStart+chunkSize, endLine)
 
 				buf := make([]byte, 0, chunkSize*30)
 				for j := chunkStart; j < chunkEnd; j++ {
