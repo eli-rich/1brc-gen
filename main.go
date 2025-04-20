@@ -126,8 +126,15 @@ func main() {
 				buf := make([]byte, 0, chunkSize*30)
 				for j := chunkStart; j < chunkEnd; j++ {
 					cityIdx := r.Intn(len(cityBytes))
-					tempIdx := r.Intn(tempPrecision)
-					tempBytes := tempStrings[tempIdx]
+					var tempBytes []byte
+
+					if r.Intn(10) < 8 {
+						tempIdx := r.Intn(tempPrecision)
+						tempBytes = tempStrings[tempIdx]
+					} else {
+						temp := r.Float64()*199.8 - 99.9
+						tempBytes = []byte(strconv.FormatFloat(temp, 'f', 1, 64))
+					}
 
 					buf = append(buf, cityBytes[cityIdx]...)
 					buf = append(buf, ';')
