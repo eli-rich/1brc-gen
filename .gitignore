@@ -1,6 +1,7 @@
 .vscode/
 
 1brc-gen
+gen.exe
 out.txt
 correct.txt
 
